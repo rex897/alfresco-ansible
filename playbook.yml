@@ -16,14 +16,9 @@
     shell: /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
     when: ansible_distribution == "MacOSX"
 
-  - name: Установка wget для загрузки образа Alfresco
-    homebrew: name=wget
-    when: ansible_distribution == "MacOSX"
-    become: no
-
-  - name: Установка wget для загрузки образа Alfresco
+  - name: Установка необходимых пакетов
     apt:
-      name: wget
+      name: ['wget', 'postgresql-client', 'python']
     when: ansible_distribution == "Ubuntu"
     become: yes
 
@@ -100,6 +95,37 @@
     file:
       path: "{{ alf_data_home }}/solr4/model"
       state: absent
+
+  - block:
+    - name: Имя БД
+      shell: "cat {{ catalina_home }}/shared/classes/alfresco-global.properties | grep db.name= | cut -f2 -d'='| cut -f1 -d' '"
+      register: db_name
+    - set_fact: db_name={{ db_name.stdout }}
+
+    - name: Пароль БД
+      shell: "cat {{ catalina_home }}/shared/classes/alfresco-global.properties | grep db.password= | cut -f2 -d'='| cut -f1 -d' '"
+      register: db_pass
+    - set_fact: db_pass={{ db_pass.stdout }}
+
+    - name: Порт
+      shell: "cat {{ catalina_home }}/shared/classes/alfresco-global.properties | grep share.host= | cut -f2 -d'='| cut -f1 -d' '"
+      register: share_host
+    - set_fact: share_host={{ share_host.stdout }}
+
+    - name: Создание БД bj
+      postgresql_db:
+          name: bj # required. name of the database to add or remove
+          encoding: undefined # not required. Encoding of the database
+          login_user: postgres # not required. The username used to authenticate with
+          port: 5432 # not required. Database port to connect to.
+          owner: alfresco # not required. Name of the role to set as owner of the database
+          login_password: "{{ db_pass }}" # not required. The password used to authenticate with
+      register: postgres
+    
+    - debug:
+        var: postgres
+
+
 
   # - debug:
   #     var: status_postgresql
