@@ -5,8 +5,8 @@
 
   vars:
     alf_home: /opt/alfresco-community
-    alf_data_home: $ALF_HOME/alf_data
-    catalina_home: $ALF_HOME/tomcat
+    alf_data_home: "{{ alf_home }}/alf_data"
+    catalina_home: "{{ alf_home }}/tomcat"
     admin_pass: Admin
     obraz: /opt/alfresco-community-installer-201605-linux-x64.bin
     uninstall: /opt/alfresco-community/uninstall
@@ -27,13 +27,14 @@
     when: ansible_distribution == "Ubuntu"
     become: yes
 
-  - name: Проверка существования образа
-    stat: path={{ obraz }}
-    register: stat_obraz
+  - block:
+    - name: Проверка существования образа
+      stat: path={{ obraz }}
+      register: stat_obraz
 
-  - name: Загрузка образа Alfresco
-    shell: wget -O {{ obraz }} http://dl.alfresco.com/release/community/201605-build-00010/alfresco-community-installer-201605-linux-x64.bin
-    when: stat_obraz.stat.exists == False
+    - name: Загрузка образа Alfresco
+      shell: wget -O {{ obraz }} http://dl.alfresco.com/release/community/201605-build-00010/alfresco-community-installer-201605-linux-x64.bin
+      when: stat_obraz.stat.exists == False
 
   - name: Создание папки для установки
     file:
@@ -43,14 +44,62 @@
   - name: Права на выполнение
     shell: chmod +x {{ obraz }}
 
+  - name: Сущетвование установленной Alfresco
+    stat: path={{ uninstall }}
+    register: uninstall_result
+  
+  # - debug:
+  #     var: uninstall_result
+
   - name: Install alfresco
     shell: "{{ obraz }} --mode unattended --prefix {{ alf_home }} --alfresco_admin_password {{ admin_pass }}"
     when: uninstall_result.stat.exists == false
 
   - name: Tomcat status
-    
+    shell: "{{ alf_home }}/alfresco.sh status tomcat"
+    register: tomcat_status
 
+  # - debug:
+  #     var: tomcat_status
 
   - name: Tomcat stop
-    shell: ./opt/alfresco-community/alfresco.sh stop tomcat
-    when: f
+    shell: "{{ alf_home }}/alfresco.sh stop tomcat"
+    when: tomcat_status.stdout == "tomcat already running"
+
+  - name: Remove catalina.out
+    file:
+      path: "{{ catalina_home }}/logs/catalina.out"
+      state: absent
+  
+  - name: Start postgresql
+    command: "{{ alf_home }}/alfresco.sh start postgresql"
+    register: status_postgresql
+
+  - block:
+    - name: Удаление старых файлов «alfresco.war» и «share.war»
+      file:
+        path: "{{ item }}"
+        state: absent
+      with_items:
+        - "{{ catalina_home }}/webapps/alfresco.war"
+        - "{{ catalina_home }}/webapps/share.war"
+    - name: Копирование новых файлов «alfresco.war» и «share.war»
+      copy: src=/Users/ks/ДАТАТЕХ/alfresco-ansible/alfresco/{{ item }} dest={{ catalina_home }}/webapps
+      with_items:
+        - alfresco.war
+        - share.war
+    - name: Удаление каталогов «alfresco» и «share»
+      file:
+        path: "{{ item }}"
+        state: absent
+      with_items:
+        - "{{ catalina_home }}/webapps/alfresco"
+        - "{{ catalina_home }}/webapps/share"
+  
+  - name: Очистка моделей solr
+    file:
+      path: "{{ alf_data_home }}/solr4/model"
+      state: absent
+
+  # - debug:
+  #     var: status_postgresql
