@@ -1,5 +1,5 @@
 ---
-- name: Установка и настройка Alfresco Communitu
+- name: Установка и настройка Alfresco Community
   hosts: virtual
   become: yes
 
@@ -18,7 +18,7 @@
 
   - name: Установка необходимых пакетов
     apt:
-      name: ['wget', 'postgresql-client', 'python']
+      name: ['wget', 'postgresql-client', 'python-psycopg2']
     when: ansible_distribution == "Ubuntu"
     become: yes
 
@@ -113,17 +113,17 @@
     - set_fact: share_host={{ share_host.stdout }}
 
     - name: Создание БД bj
+      environment:
+        PGHOST: localhost
       postgresql_db:
           name: bj # required. name of the database to add or remove
-          encoding: undefined # not required. Encoding of the database
           login_user: postgres # not required. The username used to authenticate with
           port: 5432 # not required. Database port to connect to.
           owner: alfresco # not required. Name of the role to set as owner of the database
           login_password: "{{ db_pass }}" # not required. The password used to authenticate with
       register: postgres
+
     
-    - debug:
-        var: postgres
 
 
 
