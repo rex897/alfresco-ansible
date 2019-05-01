@@ -18,7 +18,7 @@
 
   - name: Установка необходимых пакетов
     apt:
-      name: ['wget', 'postgresql-client', 'python-psycopg2']
+      name: ['wget', 'postgresql-client', 'python-psycopg2', 'openjdk-8-jre-headless']
     when: ansible_distribution == "Ubuntu"
     become: yes
 
@@ -42,9 +42,6 @@
   - name: Сущетвование установленной Alfresco
     stat: path={{ uninstall }}
     register: uninstall_result
-  
-  # - debug:
-  #     var: uninstall_result
 
   - name: Install alfresco
     shell: "{{ obraz }} --mode unattended --prefix {{ alf_home }} --alfresco_admin_password {{ admin_pass }}"
@@ -53,9 +50,6 @@
   - name: Tomcat status
     shell: "{{ alf_home }}/alfresco.sh status tomcat"
     register: tomcat_status
-
-  # - debug:
-  #     var: tomcat_status
 
   - name: Tomcat stop
     shell: "{{ alf_home }}/alfresco.sh stop tomcat"
@@ -78,11 +72,13 @@
       with_items:
         - "{{ catalina_home }}/webapps/alfresco.war"
         - "{{ catalina_home }}/webapps/share.war"
+
     - name: Копирование новых файлов «alfresco.war» и «share.war»
-      copy: src=/Users/ks/ДАТАТЕХ/alfresco-ansible/alfresco/{{ item }} dest={{ catalina_home }}/webapps
+      copy: src=./alfresco/{{ item }} dest={{ catalina_home }}/webapps
       with_items:
         - alfresco.war
         - share.war
+
     - name: Удаление каталогов «alfresco» и «share»
       file:
         path: "{{ item }}"
@@ -112,6 +108,7 @@
       register: share_host
     - set_fact: share_host={{ share_host.stdout }}
 
+  - block: 
     - name: Создание БД bj
       environment:
         PGHOST: localhost
@@ -123,9 +120,135 @@
           login_password: "{{ db_pass }}" # not required. The password used to authenticate with
       register: postgres
 
+    - name: Распаковка businessjournal.war
+      shell: "jar -xvf ./alfresco/businessjournal.war"
+
+    - name: Замена строк
+      lineinfile:
+        dest: ./WEB-INF/classes/business-journal.properties
+        regexp: "{{ item.regexp }}"
+        line: "{{ item.line }}"
+      with_items:
+        - { regexp: '^datanucleus.password=', line: 'datanucleus.password={{ db_pass }}' }
+        - { regexp: '^datanucleus.ConnectionURL=', line: 'datanucleus.ConnectionURL=jdbc:postgresql://{{ share_host }}:5432/bj' }
     
+    - name: Пакуем businessjournal.war
+      shell: "jar -cvf businessjournal.war WEB-INF META-INF"
 
+    - name: Копирование businessjournal.war
+      copy: src=./businessjournal.war dest={{ catalina_home }}/webapps
 
+  - block:
+    - name: Копирование notificationstore.war
+      copy: src=./alfresco/notificationstore.war dest={{ catalina_home }}/webapps
 
-  # - debug:
-  #     var: status_postgresql
+    - name: Создание БД notifications
+      environment:
+        PGHOST: localhost
+      postgresql_db:
+          name: notifications # required. name of the database to add or remove
+          login_user: postgres # not required. The username used to authenticate with
+          port: 5432 # not required. Database port to connect to.
+          owner: alfresco # not required. Name of the role to set as owner of the database
+          login_password: "{{ db_pass }}" # not required. The password used to authenticate with
+      register: postgres
+    
+    - name: Добавление строк 
+      shell: 
+        cmd: |
+            cat >> {{ catalina_home }}/shared/classes/alfresco-global.properties << EOL
+            
+            notificationstore.datanucleus.dbms=postgres
+            notificationstore.datanucleus.ConnectionDriverName=org.postgresql.Driver
+            notificationstore.datanucleus.ConnectionURL=jdbc:postgresql://{{ share_host }}:5432/notifications
+            notificationstore.datanucleus.ConnectionUserName={{ db_name }}
+            notificationstore.datanucleus.ConnectionPassword={{ db_pass }}
+            notificationstore.datanucleus.generateSchema.database.mode=create
+            notificationstore.brokerURL=tcp://127.0.0.1:61616
+            notifications.store.protocol=http
+            notifications.store.host=127.0.0.1
+            notifications.store.port=8080
+            notifications.store.name=notifications
+            EOL
+
+  - name: Удаление security.anyDenyDenies=false 
+    lineinfile:
+      dest: "{{ catalina_home }}/shared/classes/alfresco-global.properties"
+      regexp: "security.anyDenyDenies=false"
+      state: absent
+
+  - name: Параметр для разворачивания справочников
+    shell: 
+      cmd: |
+          cat >> {{ catalina_home }}/shared/classes/alfresco-global.properties << EOL
+          
+          lecm.dictionaries.bootstrapOnStart=true
+          EOL
+
+  - block: 
+    - name: Создание БД reporting
+      environment:
+        PGHOST: localhost
+      postgresql_db:
+          name: reporting # required. name of the database to add or remove
+          login_user: postgres # not required. The username used to authenticate with
+          port: 5432 # not required. Database port to connect to.
+          owner: alfresco # not required. Name of the role to set as owner of the database
+          login_password: "{{ db_pass }}" # not required. The password used to authenticate with
+      register: postgres
+
+    - name: Добавление строк 
+      shell: 
+        cmd: |
+            cat >> {{ catalina_home }}/shared/classes/alfresco-global.properties << EOL
+            
+            reporting.db.name=reporting
+            reporting.db.host={{ share_host }}
+            reporting.db.port=5432
+            reporting.db.username=alfresco
+            reporting.db.password={{ db_pass }}
+            reporting.db.driver=org.postgresql.Driver
+            reporting.db.url=jdbc:postgresql://{{ share_host }}:5432/reporting
+            EOL
+  
+  - name: Лицензия
+    copy: src=./alfresco/lecmlicense dest={{ catalina_home }}/shared/classes
+
+  - name: Какие-то настройки, без которых не работает БД
+    shell: 
+        cmd: |
+            cat >> {{ catalina_home }}/shared/classes/alfresco-global.properties << EOL
+            
+            businessjournal.port=8080
+            businessjournal.host=127.0.0.1
+            datanucleus.ConnectionURL=jdbc:postgresql://{{ share_host }}:5432/bj
+            datanucleus.ConnectionUserName=postgres
+            datanucleus.ConnectionPassword={{ db_pass }}
+            EOL
+  
+  - name: Remove catalina.out
+    file:
+      path: "{{ catalina_home }}/logs/catalina.out"
+      state: absent
+
+  - name: Restart
+    shell: "{{ alf_home }}/alfresco.sh restart"
+
+  - name: Ожидание запуска сервера
+    wait_for:
+      path: "{{ catalina_home }}/logs/catalina.out"
+      search_regex: 'INFO: Server startup in'
+  
+  - name: Tomcat Stop
+    shell: "{{ alf_home }}/alfresco.sh stop tomcat"
+
+  - name: Удаление alfresco.war и share.war
+    file:
+        path: "{{ item }}"
+        state: absent
+    with_items:
+      - "{{ catalina_home }}/webapps/alfresco.war"
+      - "{{ catalina_home }}/webapps/share.war"
+
+  - name: Tomcat Start
+    shell: "{{ alf_home }}/alfresco.sh start tomcat"
