@@ -18,7 +18,7 @@
 
   - name: Установка необходимых пакетов
     apt:
-      name: ['wget', 'postgresql-client', 'python-psycopg2', 'openjdk-8-jre-headless']
+      name: ['wget', 'postgresql-client', 'python-psycopg2', 'default-jre', 'unzip']
     when: ansible_distribution == "Ubuntu"
     become: yes
 
@@ -36,8 +36,13 @@
       path=/opt/alfresco-community
       state=directory
 
+  # - name: Права на выполнение
+  #   shell: chmod +x {{ obraz }}
+  
   - name: Права на выполнение
-    shell: chmod +x {{ obraz }}
+    file:
+      path: "{{ obraz }}"
+      mode: "u+rwxr,g-xr,o-x"
 
   - name: Сущетвование установленной Alfresco
     stat: path={{ uninstall }}
@@ -120,12 +125,22 @@
           login_password: "{{ db_pass }}" # not required. The password used to authenticate with
       register: postgres
 
+    - name: Копирование businessjournal.war
+      copy: src=./alfresco/businessjournal.war dest={{ catalina_home }}/webapps
+
     - name: Распаковка businessjournal.war
-      shell: "jar -xvf ./alfresco/businessjournal.war"
+      shell: "unzip -qq  {{ catalina_home }}/webapps/businessjournal.war -d {{ catalina_home }}/webapps"
+    
+    - name: Удаление старого businessjournal.war
+      file:
+        path: "{{ item }}"
+        state: absent
+      with_items:
+        - "{{ catalina_home }}/webapps/businessjournal.war"
 
     - name: Замена строк
       lineinfile:
-        dest: ./WEB-INF/classes/business-journal.properties
+        dest: "{{ catalina_home }}/webapps/WEB-INF/classes/business-journal.properties"
         regexp: "{{ item.regexp }}"
         line: "{{ item.line }}"
       with_items:
@@ -133,10 +148,7 @@
         - { regexp: '^datanucleus.ConnectionURL=', line: 'datanucleus.ConnectionURL=jdbc:postgresql://{{ share_host }}:5432/bj' }
     
     - name: Пакуем businessjournal.war
-      shell: "jar -cvf businessjournal.war WEB-INF META-INF"
-
-    - name: Копирование businessjournal.war
-      copy: src=./businessjournal.war dest={{ catalina_home }}/webapps
+      shell: "jar -cvf businessjournal.war {{ catalina_home }}/webapps/WEB-INF {{ catalina_home }}/webapps/META-INF"
 
   - block:
     - name: Копирование notificationstore.war
