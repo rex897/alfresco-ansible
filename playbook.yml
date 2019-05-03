@@ -18,7 +18,7 @@
 
   - name: Установка необходимых пакетов
     apt:
-      name: ['wget', 'postgresql-client', 'python-psycopg2', 'default-jre', 'unzip']
+      name: ['wget', 'postgresql-client', 'python-psycopg2', 'default-jre', 'unzip', 'default-jdk', 'zip']
     when: ansible_distribution == "Ubuntu"
     become: yes
 
@@ -148,7 +148,15 @@
         - { regexp: '^datanucleus.ConnectionURL=', line: 'datanucleus.ConnectionURL=jdbc:postgresql://{{ share_host }}:5432/bj' }
     
     - name: Пакуем businessjournal.war
-      shell: "jar -cvf businessjournal.war {{ catalina_home }}/webapps/WEB-INF {{ catalina_home }}/webapps/META-INF"
+      shell: "zip -r businessjournal.war {{ catalina_home }}/webapps/WEB-INF {{ catalina_home }}/webapps/META-INF"
+    
+    - name: Удаление {{ catalina_home }}/webapps/WEB-INF {{ catalina_home }}/webapps/META-INF
+      file:
+        path: "{{ item }}"
+        state: absent
+      with_items:
+        - "{{ catalina_home }}/webapps/WEB-INF"
+        - "{{ catalina_home }}/webapps/META-INF"
 
   - block:
     - name: Копирование notificationstore.war
@@ -244,12 +252,13 @@
       state: absent
 
   - name: Restart
-    shell: "{{ alf_home }}/alfresco.sh restart"
+    shell: "{{ alf_home }}/alfresco.sh start tomcat"
 
   - name: Ожидание запуска сервера
     wait_for:
       path: "{{ catalina_home }}/logs/catalina.out"
       search_regex: 'INFO: Server startup in'
+      timeout: 600
   
   - name: Tomcat Stop
     shell: "{{ alf_home }}/alfresco.sh stop tomcat"
