@@ -1,0 +1,35 @@
+---
+# tasks file for server_preparation_and_install_alfresco
+- name: Install Python2
+  raw: test -e /usr/bin/python || (apt -y update && apt install -y python-minimal)
+
+- name: Установка необходимых пакетов
+  apt:
+    name: ['wget', 'postgresql-client', 'python-psycopg2', 'unzip', 'openjdk-8-jdk', 'openjdk-8-jre', 'zip']
+
+- block:
+  - name: Проверка существования образа
+    stat: path={{ obraz }}
+    register: stat_obraz
+
+- name: Загрузка образа Alfresco
+  shell: wget -O {{ obraz }} http://dl.alfresco.com/release/community/201605-build-00010/alfresco-community-installer-201605-linux-x64.bin
+  when: stat_obraz.stat.exists == False
+
+- name: Создание папки для установки
+  file:
+    path={{ alf_home }}
+    state=directory
+
+- name: Права на выполнение
+  file:
+    path: "{{ obraz }}"
+    mode: "u+rwxr,g-xr,o-x"
+
+- name: Сущетвование установленной Alfresco
+  stat: path={{ uninstall }}
+  register: uninstall_result
+
+- name: Install alfresco
+  shell: "{{ obraz }} --mode unattended --prefix {{ alf_home }} --alfresco_admin_password {{ admin_pass }}"
+  when: uninstall_result.stat.exists == false

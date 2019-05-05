@@ -1,0 +1,6 @@
+---
+# defaults file for server_preparation_and_install_alfresco
+obraz: /opt/alfresco-community-installer-201605-linux-x64.bin
+alf_home: /opt/alfresco-community
+uninstall: /opt/alfresco-community/uninstall
+admin_pass: Admin

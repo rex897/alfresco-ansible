@@ -1,0 +1,6 @@
+---
+# defaults file for installing_a_business_platform
+alf_home: /opt/alfresco-community
+alf_data_home: "{{ alf_home }}/alf_data"
+catalina_home: "{{ alf_home }}/tomcat"
+admin_pass: Admin
