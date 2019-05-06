@@ -1,0 +1,17 @@
+[Unit]
+Description=Alfresco PostgreSql service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/alfresco-community
+User=postgres
+Group=postgres
+PIDFile=/opt/alfresco-community/alf_data/postgresql/postmaster.pid
+ExecStart=/opt/alfresco-community/postgresql/scripts/ctl.sh start
+ExecStop=/opt/alfresco-community/postgresql/scripts/ctl.sh stop && /opt/alfresco-community/postgresql/scripts/ctl.sh cleanpid
+TimeoutSec=120
+LimitNOFILE=1000000
+
+[Install]
+WantedBy=multi-user.target
+Alias=postgresql

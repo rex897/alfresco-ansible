@@ -1,0 +1,20 @@
+[Unit]
+Description=Alfresco Tomcat service
+After=postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/alfresco-community
+User=root
+Group=root
+PIDFile=/opt/alfresco-community/tomcat/temp/catalina.pid
+ExecStart=/opt/alfresco-community/alfresco.sh start tomcat
+ExecStop=/opt/alfresco-community/alfresco.sh stop tomcat
+ExecReload=/opt/alfresco-community/alfresco.sh restart tomcat
+TimeoutSec=600
+LimitNOFILE=1000000
+
+[Install]
+WantedBy=multi-user.target
+Alias=alfresco
