@@ -33,3 +33,40 @@
 - name: Install alfresco
   shell: "{{ obraz }} --mode unattended --prefix {{ alf_home }} --alfresco_admin_password {{ admin_pass }}"
   when: uninstall_result.stat.exists == false
+
+# - name: Переименовать старый файл alfresco
+#   copy:
+#     src: /etc/init.d/alfresco
+#     dest: /etc/init.d/alfrescoOld
+#     remote_src: yes
+
+- name: Удалить иходный файл alfresco
+  file:
+    path: /etc/init.d/alfresco
+    state: absent
+
+- name: Copy alfresco.service and postgresql.service
+  copy:
+    src: "{{ item }}"
+    dest: /etc/systemd/system
+  with_items:
+    - alfresco.service
+    - postgresql.service
+
+- name: Создание симлинков в папке /etc/systemd/system
+  file:
+      src: "/etc/systemd/system/{{ item.src }}"
+      dest: "/etc/systemd/system/{{ item.dest }}"
+      state: link
+  with_items:
+    - {src: 'alfresco.service', dest: 'alfresco'}
+    - {src: 'postgresql.service', dest: 'postgresql'}
+
+- name: Создание симлинков в папке /etc/systemd/system/multi-user.target.wants
+  file:
+      src: "/etc/systemd/system/{{ item.src }}"
+      dest: "/etc/systemd/system/multi-user.target.wants/{{ item.dest }}"
+      state: link
+  with_items:
+    - {src: 'alfresco.service', dest: 'alfresco.service'}
+    - {src: 'postgresql.service', dest: 'postgresql.service'}

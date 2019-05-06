@@ -4,8 +4,10 @@
   shell: "{{ alf_home }}/alfresco.sh status tomcat"
   register: tomcat_status
 
-- name: Tomcat stop
-  shell: "{{ alf_home }}/alfresco.sh stop tomcat"
+- name: Stop tomcat
+  service:
+    name: alfresco
+    state: stopped
   when: tomcat_status.stdout == "tomcat already running"
 
 - name: Remove catalina.out
@@ -13,9 +15,13 @@
     path: "{{ catalina_home }}/logs/catalina.out"
     state: absent
 
+- name: Postgresql status
+  shell: "{{ alf_home }}/alfresco.sh status postgresql"
+  register: postgresql_status
+
 - name: Start postgresql
-  command: "{{ alf_home }}/alfresco.sh start postgresql"
-  register: status_postgresql
+  shell: "{{ alf_home }}/alfresco.sh start postgresql"
+  when: postgresql_status.stdout == "postgresql not running"
 
 - block:
   - name: Удаление старых файлов «alfresco.war» и «share.war»
@@ -199,8 +205,15 @@
     path: "{{ catalina_home }}/logs/catalina.out"
     state: absent
 
-- name: Restart
-  shell: "{{ alf_home }}/alfresco.sh start tomcat"
+- name: Tomcat status
+  shell: "{{ alf_home }}/alfresco.sh status tomcat"
+  register: tomcat_status
+
+- name: Start tomcat
+  service: 
+    name: alfresco
+    state: started
+  when: tomcat_status.stdout == "tomcat not running"
 
 - name: Ожидание запуска сервера
   wait_for:
@@ -208,8 +221,15 @@
     search_regex: 'INFO: Server startup in'
     timeout: 600
 
-- name: Tomcat Stop
-  shell: "{{ alf_home }}/alfresco.sh stop tomcat"
+- name: Tomcat status
+  shell: "{{ alf_home }}/alfresco.sh status tomcat"
+  register: tomcat_status
+
+- name: Stop tomcat
+  service: 
+    name: alfresco
+    state: stopped
+  when: tomcat_status.stdout == "tomcat already running"
 
 - name: Удаление alfresco.war и share.war
   file:
@@ -219,5 +239,12 @@
     - "{{ catalina_home }}/webapps/alfresco.war"
     - "{{ catalina_home }}/webapps/share.war"
 
-- name: Tomcat Start
-  shell: "{{ alf_home }}/alfresco.sh start tomcat"
+- name: Tomcat status
+  shell: "{{ alf_home }}/alfresco.sh status tomcat"
+  register: tomcat_status
+
+- name: Start tomcat
+  service: 
+    name: alfresco
+    state: started
+  when: tomcat_status.stdout == "tomcat not running"

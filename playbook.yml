@@ -1,8 +1,8 @@
 ---
 - name: Установка и настройка Alfresco Community
   hosts: virtual
-  become: yes
+#   become: yes
 
   roles:
-    - { role: server_preparation_and_install_alfresco, when: ansible_distribution == "Ubuntu" }
-    - { role: installing_a_business_platform, when: ansible_distribution == "Ubuntu" }
+    - { role: server_preparation_and_install_alfresco, when: ansible_distribution == "Ubuntu", become: yes }
+    # - { role: installing_a_business_platform, when: ansible_distribution == "Ubuntu" }
