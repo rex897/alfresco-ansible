@@ -20,7 +20,7 @@
   register: postgresql_status
 
 - name: Start postgresql
-  shell: "{{ alf_home }}/alfresco.sh start postgresql"
+  shell: "service postgresql start"
   when: postgresql_status.stdout == "postgresql not running"
 
 - block:

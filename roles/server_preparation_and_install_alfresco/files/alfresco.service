@@ -6,8 +6,8 @@ Wants=postgresql.service
 [Service]
 Type=simple
 WorkingDirectory=/opt/alfresco-community
-User=root
-Group=root
+User=tomcat
+Group=tomcat
 PIDFile=/opt/alfresco-community/tomcat/temp/catalina.pid
 ExecStart=/opt/alfresco-community/alfresco.sh start tomcat
 ExecStop=/opt/alfresco-community/alfresco.sh stop tomcat
