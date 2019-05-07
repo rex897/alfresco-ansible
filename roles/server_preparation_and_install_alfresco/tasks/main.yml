@@ -34,12 +34,6 @@
   shell: "{{ obraz }} --mode unattended --prefix {{ alf_home }} --alfresco_admin_password {{ admin_pass }}"
   when: uninstall_result.stat.exists == false
 
-# - name: Переименовать старый файл alfresco
-#   copy:
-#     src: /etc/init.d/alfresco
-#     dest: /etc/init.d/alfrescoOld
-#     remote_src: yes
-
 - name: Удалить иходный файл alfresco
   file:
     path: /etc/init.d/alfresco
@@ -70,3 +64,6 @@
   with_items:
     - {src: 'alfresco.service', dest: 'alfresco.service'}
     - {src: 'postgresql.service', dest: 'postgresql.service'}
+
+- name: systemctl daemon-reload
+  shell: systemctl daemon-reload

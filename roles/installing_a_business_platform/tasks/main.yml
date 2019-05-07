@@ -1,14 +1,9 @@
 ---
 # tasks file for installing_a_business_platform
-- name: Tomcat status
-  shell: "{{ alf_home }}/alfresco.sh status tomcat"
-  register: tomcat_status
-
 - name: Stop tomcat
   service:
     name: alfresco
     state: stopped
-  when: tomcat_status.stdout == "tomcat already running"
 
 - name: Remove catalina.out
   file:
@@ -127,7 +122,7 @@
         login_password: "{{ db_pass }}" # not required. The password used to authenticate with
     register: postgres
 
-  - name: Добавление строк 
+  - name: Настройка параметров в alfresco-global.properties
     shell: 
       cmd: |
           cat >> {{ catalina_home }}/shared/classes/alfresco-global.properties << EOL
@@ -143,6 +138,22 @@
           notifications.store.host=127.0.0.1
           notifications.store.port=8080
           notifications.store.name=notifications
+          
+          reporting.db.name=reporting
+          reporting.db.host={{ share_host }}
+          reporting.db.port=5432
+          reporting.db.username=alfresco
+          reporting.db.password={{ db_pass }}
+          reporting.db.driver=org.postgresql.Driver
+          reporting.db.url=jdbc:postgresql://{{ share_host }}:\${reporting.db.port}/\${reporting.db.name}
+
+          businessjournal.port=8080
+          businessjournal.host=127.0.0.1
+          datanucleus.ConnectionURL=jdbc:postgresql://{{ share_host }}:5432/bj
+          datanucleus.ConnectionUserName=postgres
+          datanucleus.ConnectionPassword={{ db_pass }}
+          
+          lecm.dictionaries.bootstrapOnStart=true
           EOL
 
 - name: Удаление security.anyDenyDenies=false 
@@ -150,14 +161,6 @@
     dest: "{{ catalina_home }}/shared/classes/alfresco-global.properties"
     regexp: "security.anyDenyDenies=false"
     state: absent
-
-- name: Параметр для разворачивания справочников
-  shell:
-    cmd: |
-        cat >> {{ catalina_home }}/shared/classes/alfresco-global.properties << EOL
-        
-        lecm.dictionaries.bootstrapOnStart=true
-        EOL
 
 - block: 
   - name: Создание БД reporting
@@ -171,49 +174,18 @@
         login_password: "{{ db_pass }}" # not required. The password used to authenticate with
     register: postgres
 
-  - name: Добавление строк 
-    shell: 
-      cmd: |
-          cat >> {{ catalina_home }}/shared/classes/alfresco-global.properties << EOL
-        
-          reporting.db.name=reporting
-          reporting.db.host={{ share_host }}
-          reporting.db.port=5432
-          reporting.db.username=alfresco
-          reporting.db.password={{ db_pass }}
-          reporting.db.driver=org.postgresql.Driver
-          reporting.db.url=jdbc:postgresql://{{ share_host }}:5432/reporting
-          EOL
-
 - name: Лицензия
   copy: src=lecmlicense dest={{ catalina_home }}/shared/classes
-
-- name: Какие-то настройки, без которых не работает БД
-  shell: 
-    cmd: |
-        cat >> {{ catalina_home }}/shared/classes/alfresco-global.properties << EOL
-        
-        businessjournal.port=8080
-        businessjournal.host=127.0.0.1
-        datanucleus.ConnectionURL=jdbc:postgresql://{{ share_host }}:5432/bj
-        datanucleus.ConnectionUserName=postgres
-        datanucleus.ConnectionPassword={{ db_pass }}
-        EOL
 
 - name: Remove catalina.out
   file:
     path: "{{ catalina_home }}/logs/catalina.out"
     state: absent
 
-- name: Tomcat status
-  shell: "{{ alf_home }}/alfresco.sh status tomcat"
-  register: tomcat_status
-
 - name: Start tomcat
-  service: 
+  service:
     name: alfresco
     state: started
-  when: tomcat_status.stdout == "tomcat not running"
 
 - name: Ожидание запуска сервера
   wait_for:
@@ -221,15 +193,10 @@
     search_regex: 'INFO: Server startup in'
     timeout: 600
 
-- name: Tomcat status
-  shell: "{{ alf_home }}/alfresco.sh status tomcat"
-  register: tomcat_status
-
 - name: Stop tomcat
   service: 
     name: alfresco
     state: stopped
-  when: tomcat_status.stdout == "tomcat already running"
 
 - name: Удаление alfresco.war и share.war
   file:
@@ -239,12 +206,7 @@
     - "{{ catalina_home }}/webapps/alfresco.war"
     - "{{ catalina_home }}/webapps/share.war"
 
-- name: Tomcat status
-  shell: "{{ alf_home }}/alfresco.sh status tomcat"
-  register: tomcat_status
-
 - name: Start tomcat
-  service: 
+  service:
     name: alfresco
     state: started
-  when: tomcat_status.stdout == "tomcat not running"
