@@ -30,9 +30,11 @@
   stat: path={{ uninstall }}
   register: uninstall_result
 
+
 - name: Install alfresco
   shell: "{{ obraz }} --mode unattended --prefix {{ alf_home }} --alfresco_admin_password {{ admin_pass }}"
   when: uninstall_result.stat.exists == false
+  
 
 - name: Удалить иходный файл alfresco
   file:
