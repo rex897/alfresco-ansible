@@ -1,8 +1,22 @@
 ---
-- name: Установка и настройка Alfresco Community
+- name: Installing and configuring Alfresco Community
   hosts: virtual
-#   become: yes
+  become: yes
+
+  pre_tasks:
+    - name: Get page status
+      uri:
+        url: "http://localhost:8081/share/page/lecm/version"
+        body_format: json
+      register: result_status
+      ignore_errors: yes
+  
+    - name: Get license status
+      stat:
+        src_path: "{{ catalina_home }}/shared/classes/lecmlicense"
+      register: file_status
 
   roles:
-    - { role: server_preparation_and_install_alfresco, when: ansible_distribution == "Ubuntu", become: yes }
-    - { role: installing_a_business_platform, when: ansible_distribution == "Ubuntu", become: yes }
+    - { role: server_preparation_and_install_alfresco, when: result_status.status != 200 and file_status.stat.exists != true }
+    - { role: installing_a_business_platform, when: result_status.status != 200 and file_status.stat.exists != true }
+    - { role: update, when: result_status.status == 200 or file_status.stat.exists == true }

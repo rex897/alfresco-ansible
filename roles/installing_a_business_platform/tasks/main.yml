@@ -1,11 +1,11 @@
 ---
 # tasks file for installing_a_business_platform
-- name: Stop tomcat
+- name: Tomcat stop
   service:
     name: alfresco
     state: stopped
 
-- name: Remove catalina.out
+- name: Removing catalina.out
   file:
     path: "{{ catalina_home }}/logs/catalina.out"
     state: absent
@@ -14,56 +14,56 @@
   shell: "{{ alf_home }}/alfresco.sh status postgresql"
   register: postgresql_status
 
-- name: Start postgresql
+- name: Postgresql start
   shell: "service postgresql start"
   when: postgresql_status.stdout == "postgresql not running"
 
 - block:
-  - name: Удаление старых файлов «alfresco.war» и «share.war»
+  - name: Removing old files "alfresco.war" and "share.war"
     file:
       path: "{{ item }}"
       state: absent
-    with_items:
+    loop:
       - "{{ catalina_home }}/webapps/alfresco.war"
       - "{{ catalina_home }}/webapps/share.war"
 
-  - name: Копирование новых файлов «alfresco.war» и «share.war»
+  - name: Copying new files "alfresco.war" and "share.war"
     copy: src={{ item }} dest={{ catalina_home }}/webapps
     with_items:
-      - alfresco.war
-      - share.war
+      - /Users/ks/ДАТАТЕХ/JENKINS/rosneft_jenkins/server/alfresco/target/alfresco.war
+      - /Users/ks/ДАТАТЕХ/JENKINS/rosneft_jenkins/server/share/target/share.war
 
-  - name: Удаление каталогов «alfresco» и «share»
+  - name: Removing old alfresco and share directories
     file:
       path: "{{ item }}"
       state: absent
-    with_items:
+    loop:
       - "{{ catalina_home }}/webapps/alfresco"
       - "{{ catalina_home }}/webapps/share"
 
-- name: Очистка моделей solr
+- name: Cleaning solr models
   file:
     path: "{{ alf_data_home }}/solr4/model"
     state: absent
 
 - block:
-  - name: Имя БД
+  - name: DB name
     shell: "cat {{ catalina_home }}/shared/classes/alfresco-global.properties | grep db.name= | cut -f2 -d'='| cut -f1 -d' '"
     register: db_name
   - set_fact: db_name={{ db_name.stdout }}
 
-  - name: Пароль БД
+  - name: DB pass
     shell: "cat {{ catalina_home }}/shared/classes/alfresco-global.properties | grep db.password= | cut -f2 -d'='| cut -f1 -d' '"
     register: db_pass
   - set_fact: db_pass={{ db_pass.stdout }}
 
-  - name: Порт
+  - name: Port
     shell: "cat {{ catalina_home }}/shared/classes/alfresco-global.properties | grep share.host= | cut -f2 -d'='| cut -f1 -d' '"
     register: share_host
   - set_fact: share_host={{ share_host.stdout }}
 
 - block: 
-  - name: Создание БД bj
+  - name: Creating DB bj
     environment:
       PGHOST: localhost
     postgresql_db:
@@ -74,20 +74,20 @@
         login_password: "{{ db_pass }}" # not required. The password used to authenticate with
     register: postgres
 
-  - name: Копирование businessjournal.war
+  - name: Copy businessjournal.war
     copy: src=businessjournal.war dest={{ catalina_home }}/webapps
 
-  - name: Распаковка businessjournal.war
+  - name: Unpacking businessjournal.war
     shell: "unzip -qq  {{ catalina_home }}/webapps/businessjournal.war -d {{ catalina_home }}/webapps"
 
-  - name: Удаление старого businessjournal.war
+  - name: Removing old businessjournal.war
     file:
       path: "{{ item }}"
       state: absent
     with_items:
       - "{{ catalina_home }}/webapps/businessjournal.war"
 
-  - name: Замена строк
+  - name: Replacing strings
     lineinfile:
       dest: "{{ catalina_home }}/webapps/WEB-INF/classes/business-journal.properties"
       regexp: "{{ item.regexp }}"
@@ -96,10 +96,10 @@
       - { regexp: '^datanucleus.password=', line: 'datanucleus.password={{ db_pass }}' }
       - { regexp: '^datanucleus.ConnectionURL=', line: 'datanucleus.ConnectionURL=jdbc:postgresql://{{ share_host }}:5432/bj' }
 
-  - name: Пакуем businessjournal.war
+  - name: Packaging businessjournal.war
     shell: "zip -r {{ catalina_home }}/webapps/businessjournal.war {{ catalina_home }}/webapps/WEB-INF {{ catalina_home }}/webapps/META-INF"
 
-  - name: Удаление {{ catalina_home }}/webapps/WEB-INF {{ catalina_home }}/webapps/META-INF
+  - name: Removing {{ catalina_home }}/webapps/WEB-INF and {{ catalina_home }}/webapps/META-INF
     file:
       path: "{{ item }}"
       state: absent
@@ -108,10 +108,10 @@
       - "{{ catalina_home }}/webapps/META-INF"
 
 - block:
-  - name: Копирование notificationstore.war
+  - name: Copy notificationstore.war
     copy: src=notificationstore.war dest={{ catalina_home }}/webapps
 
-  - name: Создание БД notifications
+  - name: Creating DB notifications
     environment:
       PGHOST: localhost
     postgresql_db:
@@ -122,7 +122,7 @@
         login_password: "{{ db_pass }}" # not required. The password used to authenticate with
     register: postgres
 
-  - name: Настройка параметров в alfresco-global.properties
+  - name: Setting parameters in alfresco-global.properties
     shell: 
       cmd: |
           cat >> {{ catalina_home }}/shared/classes/alfresco-global.properties << EOL
@@ -156,14 +156,14 @@
           lecm.dictionaries.bootstrapOnStart=true
           EOL
 
-- name: Удаление security.anyDenyDenies=false 
+- name: Removing security.anyDenyDenies=false 
   lineinfile:
     dest: "{{ catalina_home }}/shared/classes/alfresco-global.properties"
     regexp: "security.anyDenyDenies=false"
     state: absent
 
 - block: 
-  - name: Создание БД reporting
+  - name: Creating DB reporting
     environment:
       PGHOST: localhost
     postgresql_db:
@@ -174,31 +174,31 @@
         login_password: "{{ db_pass }}" # not required. The password used to authenticate with
     register: postgres
 
-- name: Лицензия
+- name: License
   copy: src=lecmlicense dest={{ catalina_home }}/shared/classes
 
-- name: Remove catalina.out
+- name: Removing catalina.out
   file:
     path: "{{ catalina_home }}/logs/catalina.out"
     state: absent
 
-- name: Start tomcat
+- name: Tomcat start
   service:
     name: alfresco
     state: started
 
-- name: Ожидание запуска сервера
+- name: Waiting for server to start
   wait_for:
     path: "{{ catalina_home }}/logs/catalina.out"
     search_regex: 'INFO: Server startup in'
-    timeout: 600
+    timeout: 1000
 
-- name: Stop tomcat
+- name: Tomcat stop
   service: 
     name: alfresco
     state: stopped
 
-- name: Удаление alfresco.war и share.war
+- name: Removing alfresco.war and share.war
   file:
     path: "{{ item }}"
     state: absent
@@ -206,7 +206,7 @@
     - "{{ catalina_home }}/webapps/alfresco.war"
     - "{{ catalina_home }}/webapps/share.war"
 
-- name: Start tomcat
+- name: Tomcat start
   service:
     name: alfresco
     state: started
