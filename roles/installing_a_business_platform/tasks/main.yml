@@ -30,8 +30,8 @@
   - name: Copying new files "alfresco.war" and "share.war"
     copy: src={{ item }} dest={{ catalina_home }}/webapps
     with_items:
-      - /Users/ks/ДАТАТЕХ/JENKINS/rosneft_jenkins/server/alfresco/target/alfresco.war
-      - /Users/ks/ДАТАТЕХ/JENKINS/rosneft_jenkins/server/share/target/share.war
+      - alfresco.war
+      - share.war
 
   - name: Removing old alfresco and share directories
     file:

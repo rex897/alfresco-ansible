@@ -13,7 +13,7 @@
   
     - name: Get license status
       stat:
-        src_path: "{{ catalina_home }}/shared/classes/lecmlicense"
+        src_path: "{{ catalina_home }}/share d/classes/lecmlicense"
       register: file_status
 
   roles:
