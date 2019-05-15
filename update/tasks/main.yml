@@ -1,0 +1,67 @@
+---
+# tasks file for update
+- name: Tomcat stop
+  service:
+    name: alfresco
+    state: stopped
+
+- name: Removing catalina.out
+  file:
+    path: "{{ catalina_home }}/logs/catalina.out"
+    state: absent
+
+- name: Removing old files "alfresco.war" and "share.war"
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ catalina_home }}/webapps/alfresco.war"
+    - "{{ catalina_home }}/webapps/share.war"
+
+- name: Removing old alfresco and share directories
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ catalina_home }}/webapps/alfresco"
+    - "{{ catalina_home }}/webapps/share"
+
+- name: Copying new files "alfresco.war" and "share.war"
+  copy: src={{ item }} dest={{ catalina_home }}/webapps
+  with_items:
+    - /Users/ks/ДАТАТЕХ/JENKINS/rosneft_jenkins/server/alfresco/target/alfresco.war
+    - /Users/ks/ДАТАТЕХ/JENKINS/rosneft_jenkins/server/share/target/share.war
+
+- name: Cleaning solr models
+  file:
+    path: "{{ alf_data_home }}/solr4/model"
+    state: absent
+
+- name: Tomcat start
+  service:
+    name: alfresco
+    state: started
+
+- name: Waiting for server to start
+  wait_for:
+    path: "{{ catalina_home }}/logs/catalina.out"
+    search_regex: 'INFO: Server startup in'
+    timeout: 1000
+
+- name: Tomcat stop
+  service: 
+    name: alfresco
+    state: stopped
+
+- name: Removing alfresco.war and share.war
+  file:
+    path: "{{ item }}"
+    state: absent
+  with_items:
+    - "{{ catalina_home }}/webapps/alfresco.war"
+    - "{{ catalina_home }}/webapps/share.war"
+
+- name: Tomcat start
+  service:
+    name: alfresco
+    state: started
