@@ -15,6 +15,22 @@
       stat:
         src_path: "{{ catalina_home }}/share d/classes/lecmlicense"
       register: file_status
+    
+    - name: Copying new files "alfresco.war" and "share.war" to installing_a_business_platform/files
+      copy: 
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+      with_items:
+        - {src: '/Users/ks/ДАТАТЕХ/JENKINS/rosneft_jenkins/server/alfresco/target/alfresco.war', dest: '/roles/installing_a_business_platform/files'}
+        - {src: '/Users/ks/ДАТАТЕХ/JENKINS/rosneft_jenkins/server/share/target/share.war', dest: '/roles/installing_a_business_platform/files'}
+
+    - name: Copying new files "alfresco.war" and "share.war" to update/files
+      copy: 
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+      with_items:
+        - {src: '/Users/ks/ДАТАТЕХ/JENKINS/rosneft_jenkins/server/alfresco/target/alfresco.war', dest: '/roles/update/files'}
+        - {src: '/Users/ks/ДАТАТЕХ/JENKINS/rosneft_jenkins/server/share/target/share.war', dest: '/roles/update/files'}
 
   roles:
     - { role: server_preparation_and_install_alfresco, when: result_status.status != 200 and file_status.stat.exists != true }
