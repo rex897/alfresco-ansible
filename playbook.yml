@@ -41,3 +41,5 @@
     - { role: server_preparation_and_install_alfresco, when: result_status.status != 200 and file_status.stat.exists != true, become: yes }
     - { role: installing_a_business_platform, when: result_status.status != 200 and file_status.stat.exists != true, become: yes }
     - { role: update, when: result_status.status == 200 or file_status.stat.exists == true, become: yes }
+
+    
