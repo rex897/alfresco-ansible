@@ -1,38 +1,43 @@
 ---
 - name: Installing and configuring Alfresco Community
   hosts: virtual
-  become: yes
+  # become: yes
 
   pre_tasks:
     - name: Get page status
       uri:
-        url: "http://localhost:8081/share/page/lecm/version"
+        url: "http://localhost:8080/share/page/lecm/version"
         body_format: json
       register: result_status
       ignore_errors: yes
   
     - name: Get license status
       stat:
-        src_path: "{{ catalina_home }}/share d/classes/lecmlicense"
+        path: "{{ catalina_home }}/shared/classes/lecmlicense"
       register: file_status
+      become: yes
+
     
     - name: Copying new files "alfresco.war" and "share.war" to installing_a_business_platform/files
       copy: 
         src: "{{ item.src }}"
         dest: "{{ item.dest }}"
       with_items:
-        - {src: '/Users/ks/ДАТАТЕХ/JENKINS/rosneft_jenkins/server/alfresco/target/alfresco.war', dest: '/roles/installing_a_business_platform/files'}
-        - {src: '/Users/ks/ДАТАТЕХ/JENKINS/rosneft_jenkins/server/share/target/share.war', dest: '/roles/installing_a_business_platform/files'}
+        - {src: '/Users/ks/ДАТАТЕХ/JENKINS/rosneft_jenkins/server/alfresco/target/alfresco.war', dest: 'roles/installing_a_business_platform/files'}
+        - {src: '/Users/ks/ДАТАТЕХ/JENKINS/rosneft_jenkins/server/share/target/share.war', dest: 'roles/installing_a_business_platform/files'}
+      delegate_to: localhost
+      
 
     - name: Copying new files "alfresco.war" and "share.war" to update/files
       copy: 
         src: "{{ item.src }}"
         dest: "{{ item.dest }}"
       with_items:
-        - {src: '/Users/ks/ДАТАТЕХ/JENKINS/rosneft_jenkins/server/alfresco/target/alfresco.war', dest: '/roles/update/files'}
-        - {src: '/Users/ks/ДАТАТЕХ/JENKINS/rosneft_jenkins/server/share/target/share.war', dest: '/roles/update/files'}
+        - {src: '/Users/ks/ДАТАТЕХ/JENKINS/rosneft_jenkins/server/alfresco/target/alfresco.war', dest: 'roles/update/files'}
+        - {src: '/Users/ks/ДАТАТЕХ/JENKINS/rosneft_jenkins/server/share/target/share.war', dest: 'roles/update/files'}
+      delegate_to: localhost
 
   roles:
-    - { role: server_preparation_and_install_alfresco, when: result_status.status != 200 and file_status.stat.exists != true }
-    - { role: installing_a_business_platform, when: result_status.status != 200 and file_status.stat.exists != true }
-    - { role: update, when: result_status.status == 200 or file_status.stat.exists == true }
+    - { role: server_preparation_and_install_alfresco, when: result_status.status != 200 and file_status.stat.exists != true, become: yes }
+    - { role: installing_a_business_platform, when: result_status.status != 200 and file_status.stat.exists != true, become: yes }
+    - { role: update, when: result_status.status == 200 or file_status.stat.exists == true, become: yes }
