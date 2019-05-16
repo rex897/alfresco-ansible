@@ -1,0 +1,4 @@
+---
+# defaults file for update
+alf_data_home: "{{ alf_home }}/alf_data"
+catalina_home: "{{ alf_home }}/tomcat"
