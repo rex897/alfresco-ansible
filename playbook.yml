@@ -1,7 +1,6 @@
 ---
 - name: Installing and configuring Alfresco Community
   hosts: virtual
-  # become: yes
 
   pre_tasks:
     - name: Installing Python2
