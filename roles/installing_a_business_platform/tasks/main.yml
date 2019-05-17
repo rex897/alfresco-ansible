@@ -10,26 +10,17 @@
     path: "{{ catalina_home }}/logs/catalina.out"
     state: absent
 
-- name: Postgresql status
-  shell: "{{ alf_home }}/alfresco.sh status postgresql"
-  register: postgresql_status
-
 - name: Postgresql start
-  shell: "service postgresql start"
-  when: postgresql_status.stdout == "postgresql not running"
+  systemd:
+    name: postgresql
+    state: started
 
 - block:
-  - name: Removing old files "alfresco.war" and "share.war"
-    file:
-      path: "{{ item }}"
-      state: absent
-    loop:
-      - "{{ catalina_home }}/webapps/alfresco.war"
-      - "{{ catalina_home }}/webapps/share.war"
-
   - name: Copying new files "alfresco.war" and "share.war"
-    copy: src={{ item }} dest={{ catalina_home }}/webapps
-    with_items:
+    copy:
+      src: "{{ item }}"
+      dest: "{{ catalina_home }}/webapps"
+    loop:
       - alfresco.war
       - share.war
 
@@ -47,22 +38,6 @@
     state: absent
 
 - block:
-  - name: DB name
-    shell: "cat {{ catalina_home }}/shared/classes/alfresco-global.properties | grep db.name= | cut -f2 -d'='| cut -f1 -d' '"
-    register: db_name
-  - set_fact: db_name={{ db_name.stdout }}
-
-  - name: DB pass
-    shell: "cat {{ catalina_home }}/shared/classes/alfresco-global.properties | grep db.password= | cut -f2 -d'='| cut -f1 -d' '"
-    register: db_pass
-  - set_fact: db_pass={{ db_pass.stdout }}
-
-  - name: Port
-    shell: "cat {{ catalina_home }}/shared/classes/alfresco-global.properties | grep share.host= | cut -f2 -d'='| cut -f1 -d' '"
-    register: share_host
-  - set_fact: share_host={{ share_host.stdout }}
-
-- block: 
   - name: Creating DB bj
     environment:
       PGHOST: localhost
@@ -71,20 +46,25 @@
         login_user: postgres # not required. The username used to authenticate with
         port: 5432 # not required. Database port to connect to.
         owner: alfresco # not required. Name of the role to set as owner of the database
-        login_password: "{{ db_pass }}" # not required. The password used to authenticate with
+        login_password: "{{ admin_pass }}" # not required. The password used to authenticate with
     register: postgres
 
   - name: Copy businessjournal.war
-    copy: src=businessjournal.war dest={{ catalina_home }}/webapps
+    copy:
+      src: businessjournal.war
+      dest: "{{ catalina_home }}/webapps"
 
   - name: Unpacking businessjournal.war
-    shell: "unzip -qq  {{ catalina_home }}/webapps/businessjournal.war -d {{ catalina_home }}/webapps"
+    unarchive:
+      src: "{{ catalina_home }}/webapps/businessjournal.war"
+      dest: "{{ catalina_home }}/webapps"
+      remote_src: yes
 
   - name: Removing old businessjournal.war
     file:
       path: "{{ item }}"
       state: absent
-    with_items:
+    loop:
       - "{{ catalina_home }}/webapps/businessjournal.war"
 
   - name: Replacing strings
@@ -92,24 +72,26 @@
       dest: "{{ catalina_home }}/webapps/WEB-INF/classes/business-journal.properties"
       regexp: "{{ item.regexp }}"
       line: "{{ item.line }}"
-    with_items:
-      - { regexp: '^datanucleus.password=', line: 'datanucleus.password={{ db_pass }}' }
-      - { regexp: '^datanucleus.ConnectionURL=', line: 'datanucleus.ConnectionURL=jdbc:postgresql://{{ share_host }}:5432/bj' }
+    loop:
+      - { regexp: '^datanucleus.password=', line: 'datanucleus.password=\${db.password}' }
+      - { regexp: '^datanucleus.ConnectionURL=', line: 'datanucleus.ConnectionURL=jdbc:postgresql://\${share.host}:5432/bj' }
 
   - name: Packaging businessjournal.war
-    shell: "zip -r {{ catalina_home }}/webapps/businessjournal.war {{ catalina_home }}/webapps/WEB-INF {{ catalina_home }}/webapps/META-INF"
+    command: "zip -r {{ catalina_home }}/webapps/businessjournal.war {{ catalina_home }}/webapps/WEB-INF {{ catalina_home }}/webapps/META-INF"
 
   - name: Removing {{ catalina_home }}/webapps/WEB-INF and {{ catalina_home }}/webapps/META-INF
     file:
       path: "{{ item }}"
       state: absent
-    with_items:
+    loop:
       - "{{ catalina_home }}/webapps/WEB-INF"
       - "{{ catalina_home }}/webapps/META-INF"
 
 - block:
   - name: Copy notificationstore.war
-    copy: src=notificationstore.war dest={{ catalina_home }}/webapps
+    copy:
+      src: notificationstore.war
+      dest: "{{ catalina_home }}/webapps"
 
   - name: Creating DB notifications
     environment:
@@ -119,50 +101,48 @@
         login_user: postgres # not required. The username used to authenticate with
         port: 5432 # not required. Database port to connect to.
         owner: alfresco # not required. Name of the role to set as owner of the database
-        login_password: "{{ db_pass }}" # not required. The password used to authenticate with
+        login_password: "{{ admin_pass }}" # not required. The password used to authenticate with
     register: postgres
 
   - name: Setting parameters in alfresco-global.properties
-    shell: 
-      cmd: |
-          cat >> {{ catalina_home }}/shared/classes/alfresco-global.properties << EOL
-        
+    blockinfile:
+      path: "{{ catalina_home }}/shared/classes/alfresco-global.properties"
+      block: |
           notificationstore.datanucleus.dbms=postgres
           notificationstore.datanucleus.ConnectionDriverName=org.postgresql.Driver
-          notificationstore.datanucleus.ConnectionURL=jdbc:postgresql://{{ share_host }}:5432/notifications
-          notificationstore.datanucleus.ConnectionUserName={{ db_name }}
-          notificationstore.datanucleus.ConnectionPassword={{ db_pass }}
+          notificationstore.datanucleus.ConnectionURL=jdbc:postgresql://\${share.host}:5432/notifications
+          notificationstore.datanucleus.ConnectionUserName=\${db.name }
+          notificationstore.datanucleus.ConnectionPassword=\${db.password}
           notificationstore.datanucleus.generateSchema.database.mode=create
           notificationstore.brokerURL=tcp://127.0.0.1:61616
           notifications.store.protocol=http
           notifications.store.host=127.0.0.1
           notifications.store.port=8080
           notifications.store.name=notifications
-          
+
           reporting.db.name=reporting
-          reporting.db.host={{ share_host }}
+          reporting.db.host=\${share.host}
           reporting.db.port=5432
           reporting.db.username=alfresco
-          reporting.db.password={{ db_pass }}
+          reporting.db.password=\${db.password}
           reporting.db.driver=org.postgresql.Driver
-          reporting.db.url=jdbc:postgresql://{{ share_host }}:\${reporting.db.port}/\${reporting.db.name}
+          reporting.db.url=jdbc:postgresql://\${share.host}:\${reporting.db.port}/\${reporting.db.name}
 
           businessjournal.port=8080
           businessjournal.host=127.0.0.1
-          datanucleus.ConnectionURL=jdbc:postgresql://{{ share_host }}:5432/bj
+          datanucleus.ConnectionURL=jdbc:postgresql://\${share.host}:5432/bj
           datanucleus.ConnectionUserName=postgres
-          datanucleus.ConnectionPassword={{ db_pass }}
-          
-          lecm.dictionaries.bootstrapOnStart=true
-          EOL
+          datanucleus.ConnectionPassword=\${db.password}
 
-- name: Removing security.anyDenyDenies=false 
+          lecm.dictionaries.bootstrapOnStart=true
+
+- name: Removing security.anyDenyDenies=false
   lineinfile:
     dest: "{{ catalina_home }}/shared/classes/alfresco-global.properties"
     regexp: "security.anyDenyDenies=false"
     state: absent
 
-- block: 
+- block:
   - name: Creating DB reporting
     environment:
       PGHOST: localhost
@@ -171,11 +151,13 @@
         login_user: postgres # not required. The username used to authenticate with
         port: 5432 # not required. Database port to connect to.
         owner: alfresco # not required. Name of the role to set as owner of the database
-        login_password: "{{ db_pass }}" # not required. The password used to authenticate with
+        login_password: "{{ admin_pass }}" # not required. The password used to authenticate with
     register: postgres
 
 - name: License
-  copy: src=lecmlicense dest={{ catalina_home }}/shared/classes
+  copy:
+    src: lecmlicense
+    dest: "{{ catalina_home }}/shared/classes"
 
 - name: Removing catalina.out
   file:
@@ -194,7 +176,7 @@
     timeout: 1000
 
 - name: Tomcat stop
-  service: 
+  service:
     name: alfresco
     state: stopped
 
@@ -202,7 +184,7 @@
   file:
     path: "{{ item }}"
     state: absent
-  with_items:
+  loop:
     - "{{ catalina_home }}/webapps/alfresco.war"
     - "{{ catalina_home }}/webapps/share.war"
 

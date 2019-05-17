@@ -1,40 +1,36 @@
 ---
 # tasks file for server_preparation_and_install_alfresco
-- name: Installing Python2
-  raw: test -e /usr/bin/python || (apt -y update && apt install -y python-minimal)
-
 - name: Installing Required Packages
   apt:
-    name: ['wget', 'postgresql-client', 'python-psycopg2', 'unzip', 'openjdk-8-jdk', 'openjdk-8-jre', 'zip']
+    name: "{{ packages }}"
+  vars:
+    packages:
+      - wget
+      - postgresql-client
+      - zip
+      - unzip
+      - python-psycopg2
+      - openjdk-8-jdk
 
-- block:
-  - name: Check the existence of the image
-    stat: path={{ obraz }}
-    register: stat_obraz
-
-  - name: Alfresco image download
-    shell: wget -O {{ obraz }} http://dl.alfresco.com/release/community/201605-build-00010/alfresco-community-installer-201605-linux-x64.bin
-    when: stat_obraz.stat.exists == False
+- name: Alfresco image download
+  get_url:
+    url: http://dl.alfresco.com/release/community/201605-build-00010/alfresco-community-installer-201605-linux-x64.bin
+    dest: "{{ obraz }}"
+    mode: "u+rwxr,g+xr,o+x"
 
 - name: Creating a folder for installation
   file:
-    path={{ alf_home }}
-    state=directory
-
-- name: Права на выполнение
-  file:
-    path: "{{ obraz }}"
-    mode: "u+rwxr,g-xr,o-x"
+    path: "{{ alf_home }}"
+    state: directory
 
 - name: Существование установленной Alfresco
-  stat: path={{ uninstall }}
+  stat:
+    path: "{{ uninstall }}"
   register: uninstall_result
 
-
 - name: Installing Alfresco
-  shell: "{{ obraz }} --mode unattended --prefix {{ alf_home }} --alfresco_admin_password {{ admin_pass }}"
+  command: "{{ obraz }} --mode unattended --prefix {{ alf_home }} --alfresco_admin_password {{ admin_pass }}"
   when: uninstall_result.stat.exists == false
-  
 
 - name: Удалить иходный файл alfresco
   file:
@@ -45,7 +41,7 @@
   copy:
     src: "{{ item }}"
     dest: /etc/systemd/system
-  with_items:
+  loop:
     - alfresco.service
     - postgresql.service
 
@@ -54,7 +50,7 @@
       src: "/etc/systemd/system/{{ item.src }}"
       dest: "/etc/systemd/system/{{ item.dest }}"
       state: link
-  with_items:
+  loop:
     - {src: 'alfresco.service', dest: 'alfresco'}
     - {src: 'postgresql.service', dest: 'postgresql'}
 
@@ -63,9 +59,10 @@
       src: "/etc/systemd/system/{{ item.src }}"
       dest: "/etc/systemd/system/multi-user.target.wants/{{ item.dest }}"
       state: link
-  with_items:
+  loop:
     - {src: 'alfresco.service', dest: 'alfresco.service'}
     - {src: 'postgresql.service', dest: 'postgresql.service'}
 
 - name: systemctl daemon-reload
-  shell: systemctl daemon-reload
+  systemd:
+    daemon_reload: yes

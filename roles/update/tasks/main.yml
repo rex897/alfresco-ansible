@@ -49,7 +49,7 @@
     timeout: 1000
 
 - name: Tomcat stop
-  service: 
+  service:
     name: alfresco
     state: stopped
 

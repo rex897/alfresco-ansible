@@ -4,32 +4,33 @@
   # become: yes
 
   pre_tasks:
+    - name: Installing Python2
+      raw: test -e /usr/bin/python || (apt -y update && apt install -y python-minimal)
+
     - name: Get page status
       uri:
         url: "http://localhost:8080/share/page/lecm/version"
         body_format: json
       register: result_status
       ignore_errors: yes
-  
+
     - name: Get license status
       stat:
         path: "{{ catalina_home }}/shared/classes/lecmlicense"
       register: file_status
       become: yes
 
-    
     - name: Copying new files "alfresco.war" and "share.war" to installing_a_business_platform/files
-      copy: 
+      copy:
         src: "{{ item.src }}"
         dest: "{{ item.dest }}"
       with_items:
         - {src: '/Users/ks/ДАТАТЕХ/JENKINS/rosneft_jenkins/server/alfresco/target/alfresco.war', dest: 'roles/installing_a_business_platform/files'}
         - {src: '/Users/ks/ДАТАТЕХ/JENKINS/rosneft_jenkins/server/share/target/share.war', dest: 'roles/installing_a_business_platform/files'}
       delegate_to: localhost
-      
 
     - name: Copying new files "alfresco.war" and "share.war" to update/files
-      copy: 
+      copy:
         src: "{{ item.src }}"
         dest: "{{ item.dest }}"
       with_items:
@@ -41,5 +42,3 @@
     - { role: server_preparation_and_install_alfresco, when: result_status.status != 200 and file_status.stat.exists != true, become: yes }
     - { role: installing_a_business_platform, when: result_status.status != 200 and file_status.stat.exists != true, become: yes }
     - { role: update, when: result_status.status == 200 or file_status.stat.exists == true, become: yes }
-
-    
