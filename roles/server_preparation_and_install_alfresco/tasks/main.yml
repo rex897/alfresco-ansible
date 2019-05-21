@@ -1,17 +1,5 @@
 ---
 # tasks file for server_preparation_and_install_alfresco
-- name: Installing Required Packages
-  apt:
-    name: "{{ packages }}"
-  vars:
-    packages:
-      - wget
-      - postgresql-client
-      - zip
-      - unzip
-      - python-psycopg2
-      - openjdk-8-jdk
-
 - name: Alfresco image download
   get_url:
     url: http://dl.alfresco.com/release/community/201605-build-00010/alfresco-community-installer-201605-linux-x64.bin

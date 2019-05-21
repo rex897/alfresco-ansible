@@ -10,14 +10,6 @@
     path: "{{ catalina_home }}/logs/catalina.out"
     state: absent
 
-- name: Removing old files "alfresco.war" and "share.war"
-  file:
-    path: "{{ item }}"
-    state: absent
-  loop:
-    - "{{ catalina_home }}/webapps/alfresco.war"
-    - "{{ catalina_home }}/webapps/share.war"
-
 - name: Removing old alfresco and share directories
   file:
     path: "{{ item }}"
@@ -27,7 +19,9 @@
     - "{{ catalina_home }}/webapps/share"
 
 - name: Copying new files "alfresco.war" and "share.war"
-  copy: src={{ item }} dest={{ catalina_home }}/webapps
+  copy:
+    src: "{{ item }}"
+    dest: "{{ catalina_home }}/webapps"
   with_items:
     - alfresco.war
     - share.war
